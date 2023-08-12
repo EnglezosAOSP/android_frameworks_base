@@ -30,7 +30,6 @@ import android.content.IntentFilter;
 import android.graphics.Point;
 import android.hardware.biometrics.BiometricFingerprintConstants;
 import android.hardware.biometrics.SensorProperties;
-import android.hardware.display.ColorDisplayManager;
 import android.hardware.display.DisplayManager;
 import android.hardware.fingerprint.FingerprintManager;
 import android.hardware.fingerprint.FingerprintSensorProperties;
@@ -189,10 +188,6 @@ public class UdfpsController implements DozeReceiver, Dumpable {
     private boolean mOnFingerDown;
     private boolean mAttemptedToDismissKeyguard;
     private final Set<Callback> mCallbacks = new HashSet<>();
-    private final ColorDisplayManager mColorDisplayManager;
-    private boolean mNightModeActive;
-    private int mAutoModeState;
-    private boolean mExtraDimEnabled;
 
     @VisibleForTesting
     public static final VibrationAttributes UDFPS_VIBRATION_ATTRIBUTES =
@@ -239,8 +234,6 @@ public class UdfpsController implements DozeReceiver, Dumpable {
         @Override
         public void showUdfpsOverlay(long requestId, int sensorId, int reason,
                 @NonNull IUdfpsOverlayControllerCallback callback) {
-            disableNightMode();
-            disableExtraDim();
             mFgExecutor.execute(() -> UdfpsController.this.showUdfpsOverlay(
                     new UdfpsControllerOverlay(mContext, mFingerprintManager, mInflater,
                             mWindowManager, mAccessibilityManager, mStatusBarStateController,
@@ -257,8 +250,6 @@ public class UdfpsController implements DozeReceiver, Dumpable {
 
         @Override
         public void hideUdfpsOverlay(int sensorId) {
-            setNightMode(mNightModeActive, mAutoModeState);
-            setExtraDim();
             mFgExecutor.execute(() -> {
                 if (mKeyguardUpdateMonitor.isFingerprintDetectionRunning()) {
                     // if we get here, we expect keyguardUpdateMonitor's fingerprintRunningState
@@ -768,7 +759,6 @@ public class UdfpsController implements DozeReceiver, Dumpable {
         mSystemClock = systemClock;
         mUnlockedScreenOffAnimationController = unlockedScreenOffAnimationController;
         mLatencyTracker = latencyTracker;
-        mColorDisplayManager = context.getSystemService(ColorDisplayManager.class);
         mActivityLaunchAnimator = activityLaunchAnimator;
         mAlternateTouchProvider = alternateTouchProvider.map(Provider::get).orElse(null);
         mSensorProps = new FingerprintSensorPropertiesInternal(
@@ -1164,33 +1154,4 @@ public class UdfpsController implements DozeReceiver, Dumpable {
          */
         void onFingerDown();
     }
-
-    private void disableNightMode() {
-        mAutoModeState = mColorDisplayManager.getNightDisplayAutoMode();
-        mNightModeActive = mColorDisplayManager.isNightDisplayActivated();
-        mColorDisplayManager.setNightDisplayActivated(false);
-    }
-
-    private void setNightMode(boolean activated, int autoMode) {
-        mColorDisplayManager.setNightDisplayAutoMode(0);
-        if (autoMode == 0) {
-            mColorDisplayManager.setNightDisplayActivated(activated);
-        } else if (autoMode == 1 || autoMode == 2) {
-            mColorDisplayManager.setNightDisplayAutoMode(autoMode);
-        }
-    }
-
-    public void disableExtraDim() {
-        mExtraDimEnabled = mColorDisplayManager.isReduceBrightColorsActivated();
-        if (mExtraDimEnabled) {
-            mColorDisplayManager.setReduceBrightColorsActivated(false);
-        }
-    }
-
-    public void setExtraDim(){
-        if (mExtraDimEnabled) {
-            mColorDisplayManager.setReduceBrightColorsActivated(true);
-        }
-    }
 }
- 
